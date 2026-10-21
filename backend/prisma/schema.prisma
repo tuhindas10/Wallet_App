@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TransactionType {
+  TRANSFER
+  TOPUP
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum NotificationType {
+  PAYMENT_SENT
+  PAYMENT_RECEIVED
+  REQUEST_RECEIVED
+  REQUEST_ACCEPTED
+  REQUEST_DECLINED
+  TOPUP_SUCCESS
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  username            String               @unique
+  name                String
+  email               String?              @unique
+  phone               String?              @unique
+  passwordHash        String
+  pinHash             String?
+  pinFailedAttempts   Int                  @default(0)
+  pinLockedUntil      DateTime?
+  photoUrl            String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  wallet              Wallet?
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  requestsMade        MoneyRequest[]       @relation("Requester")
+  requestsReceived    MoneyRequest[]       @relation("Payer")
+  notifications       Notification[]
+}
+
+model Wallet {
+  id                   String        @id @default(uuid())
+  userId               String        @unique
+  balancePaise         Int           @default(0)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentTransactions     Transaction[] @relation("SenderWallet")
+  receivedTransactions Transaction[] @relation("ReceiverWallet")
+}
+
+model Transaction {
+  id                String            @id @default(uuid())
+  publicTxnId       String            @unique
+  type              TransactionType
+  status            TransactionStatus @default(PENDING)
+  amountPaise       Int
+  note              String?
+  failureReason     String?
+  idempotencyKey    String?
+  razorpayOrderId   String?           @unique
+  razorpayPaymentId String?           @unique
+  senderWalletId    String?
+  receiverWalletId  String?
+  moneyRequestId    String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  senderWallet      Wallet?           @relation("SenderWallet", fields: [senderWalletId], references: [id])
+  receiverWallet    Wallet?           @relation("ReceiverWallet", fields: [receiverWalletId], references: [id])
+  moneyRequest      MoneyRequest?     @relation(fields: [moneyRequestId], references: [id])
+
+  @@unique([senderWalletId, idempotencyKey])
+  @@index([senderWalletId, createdAt])
+  @@index([receiverWalletId, createdAt])
+  @@index([status])
+}
+
+model MoneyRequest {
+  id           String        @id @default(uuid())
+  requesterId  String
+  payerId      String
+  amountPaise  Int
+  note         String?
+  status       RequestStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  respondedAt  DateTime?
+
+  requester    User          @relation("Requester", fields: [requesterId], references: [id])
+  payer        User          @relation("Payer", fields: [payerId], references: [id])
+  transactions Transaction[]
+
+  @@index([payerId, status])
+  @@index([requesterId, status])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
