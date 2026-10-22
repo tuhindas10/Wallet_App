@@ -1,0 +1,1 @@
+export const formatRupees = (paise: number) => (paise / 100).toFixed(2);

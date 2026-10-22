@@ -8,6 +8,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
@@ -18,6 +19,9 @@ import type { AuthUser } from '../common/current-user.decorator';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UsersService } from './users.service';
+import { LookupQueryDto } from './dto/lookup-query.dto';
+import { SetPinDto } from './dto/set-pin.dto';
+import { PinService } from './pin.service';
 
 const ALLOWED_TYPES: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -30,11 +34,24 @@ const ALLOWED_TYPES: Record<string, string> = {
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly pin: PinService,
+  ) { }
 
   @Get('me')
   getMe(@CurrentUser() user: AuthUser) {
     return this.users.getMe(user.userId);
+  }
+
+  @Post('me/pin')
+  setPin(@CurrentUser() user: AuthUser, @Body() dto: SetPinDto) {
+    return this.pin.setPin(user.userId, dto.pin, dto.currentPin);
+  }
+
+  @Get('lookup')
+  lookup(@Query() query: LookupQueryDto) {
+    return this.users.lookup(query.username);
   }
 
   @Patch('me')
