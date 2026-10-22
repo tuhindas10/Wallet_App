@@ -1,10 +1,16 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express'; // new
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path'; // new
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule); // changed
+
+  app.setGlobalPrefix('api');
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' }); // new
+
 
   app.setGlobalPrefix('api');
 
